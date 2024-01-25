@@ -1,10 +1,7 @@
 #include <cstring>
-#include <sodium/utils.h>
-#include <string.h>
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
-#include <ios>
 
 int main() {
     if (sodium_init() > 0) 
