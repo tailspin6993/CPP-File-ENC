@@ -16,7 +16,6 @@ int main() {
     std::cin.getline(password, 32);
 
     const std::size_t CHUNK_SIZE = 1024;
-    const std::size_t UNLOCK_DATA_LENGTH = 96;
     unsigned char buff[CHUNK_SIZE];
 
     std::ifstream inFile(fileName, std::ios::binary);
@@ -68,6 +67,7 @@ int main() {
     }
 
     crypto_stream_xchacha20_xor(masterKey, masterKey, sizeof masterKey, masterKeyNonce, key);
+    sodium_memzero(key, sizeof key);
 
     while (inFile) {
         inFile.read(reinterpret_cast<char*>(&buff), CHUNK_SIZE);
@@ -81,7 +81,6 @@ int main() {
         }
     }
 
-    sodium_memzero(key, sizeof key);
     sodium_memzero(masterKey, sizeof masterKey);
 
     inFile.close();
