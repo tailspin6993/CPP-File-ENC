@@ -52,6 +52,15 @@ int main() {
     std::ifstream inFile(fileName, std::ios::binary);
     std::ofstream outFile(fileName + "_enc", std::ios::binary);
 
+    crypto_stream_xchacha20_xor(masterKey, masterKey, sizeof masterKey, masterKeyNonce, key);
+    outFile.write(reinterpret_cast<char*>(&dataNonce), sizeof dataNonce);
+    outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
+    outFile.write(reinterpret_cast<char*>(&salt), sizeof salt);
+    outFile.write(reinterpret_cast<char*>(&masterKey), sizeof masterKey);
+
+    // decrypt master key for file encryption
+    crypto_stream_xchacha20_xor(masterKey, masterKey, sizeof masterKey, masterKeyNonce, key);
+
     while (inFile) {
         inFile.read(reinterpret_cast<char*>(&buff), CHUNK_SIZE);
         std::streamsize bytesRead = inFile.gcount();
@@ -64,20 +73,14 @@ int main() {
         }
     }
 
+    sodium_memzero(key, sizeof key);
+    sodium_memzero(masterKey, sizeof masterKey);
+
     inFile.close();
-
-    crypto_stream_xchacha20_xor(masterKey, masterKey, sizeof masterKey, masterKeyNonce, key);
-    outFile.write(reinterpret_cast<char*>(&dataNonce), sizeof dataNonce);
-    outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
-    outFile.write(reinterpret_cast<char*>(&salt), sizeof salt);
-    outFile.write(reinterpret_cast<char*>(&masterKey), sizeof masterKey);
-
     outFile.close();
 
-    sodium_memzero(key, sizeof key);
     sodium_memzero(masterKeyNonce, sizeof masterKeyNonce);
     sodium_memzero(dataNonce, sizeof dataNonce);
     sodium_memzero(salt, sizeof salt);
-    sodium_memzero(masterKey, sizeof masterKey);
     sodium_memzero(buff, sizeof buff);
 }
