@@ -107,8 +107,8 @@ int main() {
             unsigned char byteBlockDigest[crypto_generichash_blake2b_BYTES];
             crypto_generichash_blake2b(byteBlockDigest, sizeof byteBlockDigest, buff, bytesRead, masterMacKey, sizeof masterMacKey);
 
+            outFile.write(reinterpret_cast<char*>(&byteBlockDigest), sizeof byteBlockDigest);
             outFile.write(reinterpret_cast<char*>(&buff), bytesRead);
-            outFile.write(reinterpret_cast<char*>(byteBlockDigest), sizeof byteBlockDigest);
 
             sodium_memzero(buff, sizeof buff);
             sodium_memzero(byteBlockDigest, sizeof byteBlockDigest);
