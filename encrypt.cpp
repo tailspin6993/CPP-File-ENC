@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
+#include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/utils.h>
 
 void splitFullKey(unsigned char* fullKey, unsigned char* encryptionKey, int encryptionKeyLen, unsigned char* macKey, int macKeyLen) {
@@ -31,8 +32,6 @@ int main() {
     const std::size_t fullKeyLength = 
         crypto_stream_xchacha20_KEYBYTES + crypto_generichash_blake2b_KEYBYTES;
     
-    std::cout << fullKeyLength << std::endl;
-
     unsigned char fullKey[fullKeyLength];
     int hashStatus = crypto_pwhash(
         fullKey, 
@@ -104,9 +103,15 @@ int main() {
 
         if (bytesRead > 0) {
             crypto_stream_xchacha20_xor(buff, buff, sizeof buff, dataNonce, masterEncKey);
+
+            unsigned char byteBlockDigest[crypto_generichash_blake2b_BYTES];
+            crypto_generichash_blake2b(byteBlockDigest, sizeof byteBlockDigest, buff, bytesRead, masterMacKey, sizeof masterMacKey);
+
             outFile.write(reinterpret_cast<char*>(&buff), bytesRead);
+            outFile.write(reinterpret_cast<char*>(byteBlockDigest), sizeof byteBlockDigest);
 
             sodium_memzero(buff, sizeof buff);
+            sodium_memzero(byteBlockDigest, sizeof byteBlockDigest);
         }
     }
 
