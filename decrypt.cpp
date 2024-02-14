@@ -2,10 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
-#include <sodium/crypto_generichash.h>
-#include <sodium/crypto_generichash_blake2b.h>
-#include <sodium/crypto_stream_xchacha20.h>
-#include <sodium/utils.h>
+
+#include "constants.h"
 
 void splitFullKey(unsigned char* fullKey, unsigned char* encryptionKey, int encryptionKeyLen, unsigned char* macKey, int macKeyLen) {
     for (int i = 0; i < encryptionKeyLen; i++) {
@@ -19,12 +17,6 @@ void splitFullKey(unsigned char* fullKey, unsigned char* encryptionKey, int encr
 int main() {
     if (sodium_init() > 0) 
         std::cout << "Libsodium failed to initialize." << std::endl;
-
-    const std::size_t fullKeyLength = 
-        crypto_stream_xchacha20_KEYBYTES + crypto_generichash_blake2b_KEYBYTES;
-    
-    const std::size_t CHUNK_DIGEST_SIZE = 32;
-    const std::size_t CHUNK_SIZE = 1024;
         
     std::string fileName;
     std::cout << "File to decrypt: ";
@@ -38,11 +30,11 @@ int main() {
 
     std::ifstream inFile(fileName, std::ios::binary);
 
-    unsigned char masterKeyNonce[crypto_stream_xchacha20_NONCEBYTES];
-    unsigned char dataNonce[crypto_stream_xchacha20_NONCEBYTES];
-    unsigned char salt[crypto_pwhash_argon2id_SALTBYTES];
-    unsigned char masterKeyDigest[crypto_generichash_blake2b_BYTES];
-    unsigned char masterKey[fullKeyLength];
+    unsigned char masterKeyNonce[NONCE_LENGTH];
+    unsigned char dataNonce[NONCE_LENGTH];
+    unsigned char salt[SALT_LENGTH];
+    unsigned char masterKeyDigest[DIGEST_SIZE];
+    unsigned char masterKey[FULL_KEY_LENGTH];
 
     int seekPos = 0;
 
@@ -68,7 +60,7 @@ int main() {
         inFile.seekg(seekPos);
     }
     
-    unsigned char key[fullKeyLength];
+    unsigned char key[FULL_KEY_LENGTH];
     int hashStatus = crypto_pwhash(
         key, 
         sizeof key,
@@ -80,18 +72,18 @@ int main() {
         crypto_pwhash_ALG_ARGON2ID13
     );
 
-
     if (hashStatus != 0) {
         std::cout << "Key derivation failed." << std::endl;
         return 1;
     }
 
-    unsigned char userEncKey[crypto_stream_xchacha20_KEYBYTES];
-    unsigned char userMacKey[crypto_generichash_KEYBYTES];
+    unsigned char userEncKey[ENCRYPTION_KEY_LENGTH];
+    unsigned char userMacKey[MAC_KEY_LENGTH];
 
     splitFullKey(key, userEncKey, sizeof userEncKey, userMacKey, sizeof userMacKey);
+    sodium_memzero(key, sizeof key);
 
-    unsigned char computedMasterKeyDigest[crypto_generichash_blake2b_BYTES];
+    unsigned char computedMasterKeyDigest[DIGEST_SIZE];
     crypto_generichash_blake2b(computedMasterKeyDigest, sizeof computedMasterKeyDigest, masterKey, sizeof masterKey, userMacKey, sizeof userMacKey);
 
     if (sodium_memcmp(computedMasterKeyDigest, masterKeyDigest, sizeof computedMasterKeyDigest) != 0) {
@@ -101,8 +93,8 @@ int main() {
 
     crypto_stream_xchacha20_xor(masterKey, masterKey, sizeof masterKey, masterKeyNonce, userEncKey);
 
-    unsigned char masterEncKey[sizeof userEncKey];
-    unsigned char masterMacKey[sizeof userMacKey];
+    unsigned char masterEncKey[ENCRYPTION_KEY_LENGTH];
+    unsigned char masterMacKey[MAC_KEY_LENGTH];
 
     splitFullKey(masterKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
 
@@ -115,13 +107,13 @@ int main() {
     std::ofstream outFile(fileName + "_dec", std::ios::binary);
 
     while (inFile) {
-        unsigned char byteBlockDigest[CHUNK_DIGEST_SIZE];
-        inFile.read(reinterpret_cast<char*>(&byteBlockDigest), CHUNK_DIGEST_SIZE);
+        unsigned char byteBlockDigest[DIGEST_SIZE];
+        inFile.read(reinterpret_cast<char*>(&byteBlockDigest), DIGEST_SIZE);
         inFile.read(reinterpret_cast<char*>(&buff), CHUNK_SIZE);
         std::streamsize bytesRead = inFile.gcount();
 
         if (bytesRead > 0) {
-            unsigned char computedByteBlockDigest[CHUNK_DIGEST_SIZE];
+            unsigned char computedByteBlockDigest[DIGEST_SIZE];
             crypto_generichash_blake2b(computedByteBlockDigest, sizeof computedByteBlockDigest, buff, bytesRead, masterMacKey, sizeof masterMacKey);
 
             if (sodium_memcmp(byteBlockDigest, computedByteBlockDigest, sizeof computedByteBlockDigest) != 0) {
