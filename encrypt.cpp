@@ -22,12 +22,19 @@ int main() {
     std::cout << "File to encrypt: ";
     getline(std::cin, fileName);
 
-    unsigned char salt[SALT_LENGTH];
-    randombytes_buf(salt, sizeof salt);
+    std::ifstream inFile(fileName, std::ios::binary);
+
+    if(!inFile) {
+        std::cout << "File not found" << std::endl;
+        return 1;
+    }
     
     char password[32];
     std::cout << "Password (max of 32 chars): ";
     std::cin.getline(password, 32);
+
+    unsigned char salt[SALT_LENGTH];
+    randombytes_buf(salt, sizeof salt);
     
     unsigned char key[FULL_KEY_LENGTH];
     int hashStatus = crypto_pwhash(
@@ -56,22 +63,19 @@ int main() {
     sodium_memzero(password, sizeof password);
 
     unsigned char masterFullKey[FULL_KEY_LENGTH];
-    randombytes_buf(masterFullKey, sizeof masterFullKey);
 
     unsigned char masterEncKey[ENCRYPTION_KEY_LENGTH];
     unsigned char masterMacKey[MAC_KEY_LENGTH];
 
-    splitFullKey(masterFullKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
-
     unsigned char masterKeyNonce[NONCE_LENGTH];
     unsigned char dataNonce[NONCE_LENGTH];
 
+    randombytes_buf(masterFullKey, sizeof masterFullKey);
     randombytes_buf(masterKeyNonce, sizeof masterKeyNonce);
     randombytes_buf(dataNonce, sizeof dataNonce);
 
-    unsigned char buff[CHUNK_SIZE];
+    splitFullKey(masterFullKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
 
-    std::ifstream inFile(fileName, std::ios::binary);
     std::ofstream outFile(fileName + "_enc", std::ios::binary);
 
     crypto_stream_xchacha20_xor(masterFullKey, masterFullKey, sizeof masterFullKey, masterKeyNonce, userEncKey);
@@ -92,6 +96,8 @@ int main() {
     sodium_memzero(masterFullKey, sizeof masterFullKey);
     sodium_memzero(masterKeyNonce, sizeof masterKeyNonce);
     sodium_memzero(masterFullKeyDigest, sizeof masterFullKeyDigest);
+
+    unsigned char buff[CHUNK_SIZE];
 
     while (inFile) {
         inFile.read(reinterpret_cast<char*>(&buff), CHUNK_SIZE);
