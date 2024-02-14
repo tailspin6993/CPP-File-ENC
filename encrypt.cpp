@@ -2,8 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
-#include <sodium/crypto_generichash_blake2b.h>
-#include <sodium/utils.h>
+
+#include "constants.h"
 
 void splitFullKey(unsigned char* fullKey, unsigned char* encryptionKey, int encryptionKeyLen, unsigned char* macKey, int macKeyLen) {
     for (int i = 0; i < encryptionKeyLen; i++) {
@@ -22,20 +22,17 @@ int main() {
     std::cout << "File to encrypt: ";
     getline(std::cin, fileName);
 
-    unsigned char salt[crypto_pwhash_argon2id_SALTBYTES];
+    unsigned char salt[SALT_LENGTH];
     randombytes_buf(salt, sizeof salt);
     
     char password[32];
     std::cout << "Password (max of 32 chars): ";
     std::cin.getline(password, 32);
-
-    const std::size_t fullKeyLength = 
-        crypto_stream_xchacha20_KEYBYTES + crypto_generichash_blake2b_KEYBYTES;
     
-    unsigned char fullKey[fullKeyLength];
+    unsigned char key[FULL_KEY_LENGTH];
     int hashStatus = crypto_pwhash(
-        fullKey, 
-        sizeof fullKey,
+        key, 
+        sizeof key,
         password, 
         strlen(password), 
         salt,
@@ -44,47 +41,46 @@ int main() {
         crypto_pwhash_ALG_ARGON2ID13
     );
 
-    unsigned char key[crypto_stream_xchacha20_KEYBYTES];
-    unsigned char macKey[crypto_generichash_blake2b_KEYBYTES];
-
-    splitFullKey(fullKey, key, sizeof key, macKey, sizeof macKey);
-    sodium_memzero(fullKey, sizeof fullKey);
-
-    // zero-out password ASAP.
-    sodium_memzero(password, sizeof password);
-
     if (hashStatus != 0) {
         std::cout << "Key derivation failed." << std::endl;
         return 1;
     }
 
-    unsigned char masterFullKey[fullKeyLength];
+    unsigned char userEncKey[ENCRYPTION_KEY_LENGTH];
+    unsigned char userMacKey[MAC_KEY_LENGTH];
+
+    splitFullKey(key, userEncKey, sizeof userEncKey, userMacKey, sizeof userMacKey);
+    sodium_memzero(key, sizeof key);
+
+    // zero-out password ASAP.
+    sodium_memzero(password, sizeof password);
+
+    unsigned char masterFullKey[FULL_KEY_LENGTH];
     randombytes_buf(masterFullKey, sizeof masterFullKey);
 
-    unsigned char masterEncKey[sizeof key];
-    unsigned char masterMacKey[sizeof macKey];
+    unsigned char masterEncKey[ENCRYPTION_KEY_LENGTH];
+    unsigned char masterMacKey[MAC_KEY_LENGTH];
 
     splitFullKey(masterFullKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
 
-    unsigned char masterKeyNonce[crypto_stream_xchacha20_NONCEBYTES];
-    unsigned char dataNonce[crypto_stream_xchacha20_NONCEBYTES];
+    unsigned char masterKeyNonce[NONCE_LENGTH];
+    unsigned char dataNonce[NONCE_LENGTH];
 
     randombytes_buf(masterKeyNonce, sizeof masterKeyNonce);
     randombytes_buf(dataNonce, sizeof dataNonce);
 
-    const std::size_t CHUNK_SIZE = 1024;
     unsigned char buff[CHUNK_SIZE];
 
     std::ifstream inFile(fileName, std::ios::binary);
     std::ofstream outFile(fileName + "_enc", std::ios::binary);
 
-    crypto_stream_xchacha20_xor(masterFullKey, masterFullKey, sizeof masterFullKey, masterKeyNonce, key);
-    sodium_memzero(key, sizeof key);
+    crypto_stream_xchacha20_xor(masterFullKey, masterFullKey, sizeof masterFullKey, masterKeyNonce, userEncKey);
+    sodium_memzero(userEncKey, sizeof userEncKey);
 
     unsigned char masterFullKeyDigest[crypto_generichash_blake2b_BYTES];
-    crypto_generichash_blake2b(masterFullKeyDigest, sizeof masterFullKeyDigest, masterFullKey, sizeof masterFullKey, macKey, sizeof macKey);
+    crypto_generichash_blake2b(masterFullKeyDigest, sizeof masterFullKeyDigest, masterFullKey, sizeof masterFullKey, userMacKey, sizeof userMacKey);
 
-    sodium_memzero(macKey, sizeof macKey);
+    sodium_memzero(userMacKey, sizeof userMacKey);
 
     outFile.write(reinterpret_cast<char*>(&dataNonce), sizeof dataNonce);
     outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
@@ -104,7 +100,7 @@ int main() {
         if (bytesRead > 0) {
             crypto_stream_xchacha20_xor(buff, buff, sizeof buff, dataNonce, masterEncKey);
 
-            unsigned char byteBlockDigest[crypto_generichash_blake2b_BYTES];
+            unsigned char byteBlockDigest[DIGEST_SIZE];
             crypto_generichash_blake2b(byteBlockDigest, sizeof byteBlockDigest, buff, bytesRead, masterMacKey, sizeof masterMacKey);
 
             outFile.write(reinterpret_cast<char*>(&byteBlockDigest), sizeof byteBlockDigest);
