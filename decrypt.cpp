@@ -21,14 +21,13 @@ int main() {
     std::string fileName;
     std::cout << "File to decrypt: ";
     getline(std::cin, fileName);
-    
-    char password[32];
-    std::cout << "Password (max of 32 chars): ";
-    std::cin.getline(password, 32);
-
-    unsigned char buff[CHUNK_SIZE];
 
     std::ifstream inFile(fileName, std::ios::binary);
+
+    if (!inFile) {
+        std::cout << "File not found." << std::endl;
+        return 1;
+    }
 
     unsigned char masterKeyNonce[NONCE_LENGTH];
     unsigned char dataNonce[NONCE_LENGTH];
@@ -59,6 +58,10 @@ int main() {
         seekPos += sizeof masterKey;
         inFile.seekg(seekPos);
     }
+
+    char password[32];
+    std::cout << "Password (max of 32 chars): ";
+    std::cin.getline(password, 32);
     
     unsigned char key[FULL_KEY_LENGTH];
     int hashStatus = crypto_pwhash(
@@ -85,7 +88,7 @@ int main() {
 
     unsigned char computedMasterKeyDigest[DIGEST_SIZE];
     crypto_generichash_blake2b(computedMasterKeyDigest, sizeof computedMasterKeyDigest, masterKey, sizeof masterKey, userMacKey, sizeof userMacKey);
-
+    
     if (sodium_memcmp(computedMasterKeyDigest, masterKeyDigest, sizeof computedMasterKeyDigest) != 0) {
         std::cout << "Incorrect password." << std::endl;
         return 1;
@@ -105,6 +108,8 @@ int main() {
     sodium_memzero(userMacKey, sizeof userMacKey);
 
     std::ofstream outFile(fileName + "_dec", std::ios::binary);
+
+    unsigned char buff[CHUNK_SIZE];
 
     while (inFile) {
         unsigned char byteBlockDigest[DIGEST_SIZE];
