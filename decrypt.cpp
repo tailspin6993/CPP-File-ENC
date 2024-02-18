@@ -30,7 +30,6 @@ int main() {
     }
 
     unsigned char masterKeyNonce[NONCE_LENGTH];
-    unsigned char dataNonce[NONCE_LENGTH];
     unsigned char salt[SALT_LENGTH];
     unsigned char masterKeyDigest[DIGEST_SIZE];
     unsigned char masterKey[FULL_KEY_LENGTH];
@@ -38,10 +37,6 @@ int main() {
     int seekPos = 0;
 
     if (inFile) {
-        inFile.read(reinterpret_cast<char*>(dataNonce), sizeof dataNonce);
-        seekPos += sizeof dataNonce;
-        inFile.seekg(seekPos);
-
         inFile.read(reinterpret_cast<char*>(masterKeyNonce), sizeof masterKeyNonce);
         seekPos += sizeof masterKeyNonce;
         inFile.seekg(seekPos);
@@ -113,15 +108,24 @@ int main() {
 
     while (inFile) {
         unsigned char byteBlockDigest[DIGEST_SIZE];
+        unsigned char dataNonce[NONCE_LENGTH];
         inFile.read(reinterpret_cast<char*>(&byteBlockDigest), DIGEST_SIZE);
+        inFile.read(reinterpret_cast<char*>(&dataNonce), NONCE_LENGTH);
         inFile.read(reinterpret_cast<char*>(&buff), CHUNK_SIZE);
         std::streamsize bytesRead = inFile.gcount();
 
         if (bytesRead > 0) {
             unsigned char computedByteBlockDigest[DIGEST_SIZE];
-            crypto_generichash_blake2b(computedByteBlockDigest, sizeof computedByteBlockDigest, buff, bytesRead, masterMacKey, sizeof masterMacKey);
 
-            if (sodium_memcmp(byteBlockDigest, computedByteBlockDigest, sizeof computedByteBlockDigest) != 0) {
+            crypto_generichash_blake2b_state state;
+            crypto_generichash_blake2b_init(&state, masterMacKey, sizeof masterMacKey, sizeof computedByteBlockDigest);
+
+            crypto_generichash_blake2b_update(&state, dataNonce, sizeof dataNonce);
+            crypto_generichash_blake2b_update(&state, buff, bytesRead);
+
+            crypto_generichash_blake2b_final(&state, computedByteBlockDigest, sizeof computedByteBlockDigest);
+
+            if (sodium_memcmp(byteBlockDigest, computedByteBlockDigest, DIGEST_SIZE) != 0) {
                 std::cout << "MAC verification failed for byte block." << std::endl;
                 return 1;
             }
@@ -130,6 +134,7 @@ int main() {
             outFile.write(reinterpret_cast<char*>(&buff), bytesRead);
 
             sodium_memzero(buff, sizeof buff);
+            sodium_memzero(dataNonce, sizeof dataNonce);
             sodium_memzero(byteBlockDigest, sizeof byteBlockDigest);
             sodium_memzero(computedByteBlockDigest, sizeof computedByteBlockDigest);
         }
@@ -141,7 +146,6 @@ int main() {
     outFile.close();
 
     sodium_memzero(masterKeyNonce, sizeof masterKeyNonce);
-    sodium_memzero(dataNonce, sizeof dataNonce);
     sodium_memzero(salt, sizeof salt);
     sodium_memzero(buff, sizeof buff);
 
