@@ -68,11 +68,9 @@ int main() {
     unsigned char masterMacKey[MAC_KEY_LENGTH];
 
     unsigned char masterKeyNonce[NONCE_LENGTH];
-    unsigned char dataNonce[NONCE_LENGTH];
 
     randombytes_buf(masterFullKey, sizeof masterFullKey);
     randombytes_buf(masterKeyNonce, sizeof masterKeyNonce);
-    randombytes_buf(dataNonce, sizeof dataNonce);
 
     splitFullKey(masterFullKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
 
@@ -86,7 +84,6 @@ int main() {
 
     sodium_memzero(userMacKey, sizeof userMacKey);
 
-    outFile.write(reinterpret_cast<char*>(&dataNonce), sizeof dataNonce);
     outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
     outFile.write(reinterpret_cast<char*>(&salt), sizeof salt);
     outFile.write(reinterpret_cast<char*>(&masterFullKeyDigest), sizeof masterFullKeyDigest);
@@ -98,8 +95,10 @@ int main() {
     sodium_memzero(masterFullKeyDigest, sizeof masterFullKeyDigest);
 
     unsigned char buff[CHUNK_SIZE];
+    unsigned char dataNonce[NONCE_LENGTH];
 
     while (inFile) {
+        randombytes_buf(dataNonce, sizeof dataNonce);
         inFile.read(reinterpret_cast<char*>(&buff), CHUNK_SIZE);
         std::streamsize bytesRead = inFile.gcount();
 
@@ -107,13 +106,22 @@ int main() {
             crypto_stream_xchacha20_xor(buff, buff, sizeof buff, dataNonce, masterEncKey);
 
             unsigned char byteBlockDigest[DIGEST_SIZE];
-            crypto_generichash_blake2b(byteBlockDigest, sizeof byteBlockDigest, buff, bytesRead, masterMacKey, sizeof masterMacKey);
+
+            crypto_generichash_blake2b_state state;
+            crypto_generichash_blake2b_init(&state, masterMacKey, sizeof masterMacKey, sizeof byteBlockDigest);
+
+            crypto_generichash_blake2b_update(&state, dataNonce, sizeof dataNonce);
+            crypto_generichash_blake2b_update(&state, buff, bytesRead);
+
+            crypto_generichash_blake2b_final(&state, byteBlockDigest, sizeof byteBlockDigest);
 
             outFile.write(reinterpret_cast<char*>(&byteBlockDigest), sizeof byteBlockDigest);
+            outFile.write(reinterpret_cast<char*>(&dataNonce), sizeof dataNonce);
             outFile.write(reinterpret_cast<char*>(&buff), bytesRead);
 
-            sodium_memzero(buff, sizeof buff);
             sodium_memzero(byteBlockDigest, sizeof byteBlockDigest);
+            sodium_memzero(dataNonce, sizeof dataNonce);
+            sodium_memzero(buff, sizeof buff);
         }
     }
 
