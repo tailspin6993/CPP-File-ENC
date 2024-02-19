@@ -2,6 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
+#include <sodium/crypto_kdf_hkdf_sha512.h>
+#include <sodium/utils.h>
 
 #include "constants.h"
 
@@ -103,6 +105,9 @@ int main() {
         std::streamsize bytesRead = inFile.gcount();
 
         if (bytesRead > 0) {
+            crypto_kdf_hkdf_sha512_extract(masterFullKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
+            splitFullKey(masterFullKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
+
             crypto_stream_xchacha20_xor(buff, buff, sizeof buff, dataNonce, masterEncKey);
 
             unsigned char byteBlockDigest[DIGEST_SIZE];

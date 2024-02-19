@@ -115,6 +115,9 @@ int main() {
         std::streamsize bytesRead = inFile.gcount();
 
         if (bytesRead > 0) {
+            crypto_kdf_hkdf_sha512_extract(masterKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
+            splitFullKey(masterKey, masterEncKey, sizeof masterEncKey, masterMacKey, sizeof masterMacKey);
+
             unsigned char computedByteBlockDigest[DIGEST_SIZE];
 
             crypto_generichash_blake2b_state state;
@@ -130,7 +133,7 @@ int main() {
                 return 1;
             }
 
-            crypto_stream_xchacha20_xor(buff, buff, sizeof buff, dataNonce, masterKey);
+            crypto_stream_xchacha20_xor(buff, buff, sizeof buff, dataNonce, masterEncKey);
             outFile.write(reinterpret_cast<char*>(&buff), bytesRead);
 
             sodium_memzero(buff, sizeof buff);
