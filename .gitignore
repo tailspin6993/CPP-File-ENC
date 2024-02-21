@@ -1,4 +1,5 @@
 .vscode/
 testfiles/
+bin/
 makefile
 TODO.txt
