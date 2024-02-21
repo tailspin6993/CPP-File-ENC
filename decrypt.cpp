@@ -37,16 +37,16 @@ int main() {
     int seekPos = 0;
 
     if (inFile) {
-        inFile.read(reinterpret_cast<char*>(masterKeyNonce), sizeof masterKeyNonce);
-        seekPos += sizeof masterKeyNonce;
-        inFile.seekg(seekPos);
-
         inFile.read(reinterpret_cast<char*>(salt), sizeof salt);
         seekPos += sizeof salt;
         inFile.seekg(seekPos);
 
         inFile.read(reinterpret_cast<char*>(masterKeyDigest), sizeof masterKeyDigest);
         seekPos += sizeof masterKeyDigest;
+        inFile.seekg(seekPos);
+
+        inFile.read(reinterpret_cast<char*>(masterKeyNonce), sizeof masterKeyNonce);
+        seekPos += sizeof masterKeyNonce;
         inFile.seekg(seekPos);
 
         inFile.read(reinterpret_cast<char*>(masterKey), sizeof masterKey);
@@ -82,7 +82,12 @@ int main() {
     sodium_memzero(key, sizeof key);
 
     unsigned char computedMasterKeyDigest[DIGEST_SIZE];
-    crypto_generichash_blake2b(computedMasterKeyDigest, sizeof computedMasterKeyDigest, masterKey, sizeof masterKey, userMacKey, sizeof userMacKey);
+    crypto_generichash_blake2b_state state;
+    
+    crypto_generichash_blake2b_init(&state, userMacKey, sizeof userMacKey, sizeof computedMasterKeyDigest);
+    crypto_generichash_blake2b_update(&state, masterKeyNonce, sizeof masterKeyNonce);
+    crypto_generichash_blake2b_update(&state, masterKey, sizeof masterKey);
+    crypto_generichash_blake2b_final(&state, computedMasterKeyDigest, sizeof computedMasterKeyDigest);
     
     if (sodium_memcmp(computedMasterKeyDigest, masterKeyDigest, sizeof computedMasterKeyDigest) != 0) {
         std::cout << "Incorrect password." << std::endl;
