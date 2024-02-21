@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
+#include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_kdf_hkdf_sha512.h>
 #include <sodium/utils.h>
 
@@ -82,13 +83,18 @@ int main() {
     sodium_memzero(userEncKey, sizeof userEncKey);
 
     unsigned char masterFullKeyDigest[crypto_generichash_blake2b_BYTES];
-    crypto_generichash_blake2b(masterFullKeyDigest, sizeof masterFullKeyDigest, masterFullKey, sizeof masterFullKey, userMacKey, sizeof userMacKey);
+    crypto_generichash_blake2b_state state;
+    
+    crypto_generichash_blake2b_init(&state, userMacKey, sizeof userMacKey, sizeof masterFullKeyDigest);
+    crypto_generichash_blake2b_update(&state, masterKeyNonce, sizeof masterKeyNonce);
+    crypto_generichash_blake2b_update(&state, masterFullKey, sizeof masterFullKey);
+    crypto_generichash_blake2b_final(&state, masterFullKeyDigest, sizeof masterFullKeyDigest);
 
     sodium_memzero(userMacKey, sizeof userMacKey);
 
-    outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
     outFile.write(reinterpret_cast<char*>(&salt), sizeof salt);
     outFile.write(reinterpret_cast<char*>(&masterFullKeyDigest), sizeof masterFullKeyDigest);
+        outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
     outFile.write(reinterpret_cast<char*>(&masterFullKey), sizeof masterFullKey);
 
     sodium_memzero(salt, sizeof salt);
