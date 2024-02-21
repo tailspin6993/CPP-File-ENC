@@ -2,22 +2,12 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
-#include <sodium/crypto_generichash_blake2b.h>
-#include <sodium/crypto_kdf_hkdf_sha512.h>
-#include <sodium/utils.h>
 
-#include "constants.h"
-
-void splitFullKey(unsigned char* fullKey, unsigned char* encryptionKey, int encryptionKeyLen, unsigned char* macKey, int macKeyLen) {
-    for (int i = 0; i < encryptionKeyLen; i++) {
-        encryptionKey[i] = fullKey[i];
-    }
-
-    for (int i = 0; i < macKeyLen; i++)
-        macKey[i] = fullKey[i + encryptionKeyLen];
-}
+#include "crypto_helpers.h"
 
 int main() {
+    using namespace CryptoHelpers;
+
     if (sodium_init() > 0) 
         std::cout << "Libsodium failed to initialize." << std::endl;
         
@@ -40,16 +30,7 @@ int main() {
     randombytes_buf(salt, sizeof salt);
     
     unsigned char key[FULL_KEY_LENGTH];
-    int hashStatus = crypto_pwhash(
-        key, 
-        sizeof key,
-        password, 
-        strlen(password), 
-        salt,
-        crypto_pwhash_OPSLIMIT_INTERACTIVE,
-        crypto_pwhash_MEMLIMIT_INTERACTIVE,
-        crypto_pwhash_ALG_ARGON2ID13
-    );
+    int hashStatus = deriveFullKey(key, sizeof key, password, sizeof password, salt);
 
     if (hashStatus != 0) {
         std::cout << "Key derivation failed." << std::endl;
@@ -94,7 +75,7 @@ int main() {
 
     outFile.write(reinterpret_cast<char*>(&salt), sizeof salt);
     outFile.write(reinterpret_cast<char*>(&masterFullKeyDigest), sizeof masterFullKeyDigest);
-        outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
+    outFile.write(reinterpret_cast<char*>(&masterKeyNonce), sizeof masterKeyNonce);
     outFile.write(reinterpret_cast<char*>(&masterFullKey), sizeof masterFullKey);
 
     sodium_memzero(salt, sizeof salt);
