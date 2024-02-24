@@ -44,6 +44,9 @@ void writeEncryptedFile(std::ifstream &inFile, std::ofstream &outFile, unsigned 
             sodium_memzero(buff, sizeof buff);
         }
     }
+
+    sodium_memzero(masterEncKey, sizeof masterEncKey);
+    sodium_memzero(masterMacKey, sizeof masterMacKey);
 }
 
 int main() {
@@ -120,4 +123,6 @@ int main() {
 
     inFile.close();
     outFile.close();
+
+    std::cout << "Done encrypting file" << std::endl;
 }
