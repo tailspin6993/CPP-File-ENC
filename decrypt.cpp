@@ -8,8 +8,10 @@
 int main() {
     using namespace CryptoHelpers;
 
-    if (sodium_init() > 0) 
+    if (sodium_init() > 0) {
         std::cout << "Libsodium failed to initialize." << std::endl;
+        return 1;
+    }
         
     std::string fileName;
     std::cout << "File to decrypt: ";
