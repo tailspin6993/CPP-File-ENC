@@ -8,7 +8,7 @@
 int main() {
     using namespace CryptoHelpers;
 
-    if (sodium_init() > 0) {
+    if (sodium_init() == -1) {
         std::cout << "Libsodium failed to initialize." << std::endl;
         return 1;
     }
