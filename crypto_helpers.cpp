@@ -1,5 +1,6 @@
 #include <sodium.h>
 #include <cstring>
+#include <sodium/crypto_pwhash_argon2id.h>
 
 #include "crypto_helpers.h"
 
@@ -30,8 +31,8 @@ int CryptoHelpers::deriveFullKey(unsigned char* out, int outLen, char* password,
         password, 
         strlen(password), 
         salt,
-        crypto_pwhash_OPSLIMIT_INTERACTIVE,
-        crypto_pwhash_MEMLIMIT_INTERACTIVE,
+        crypto_pwhash_argon2id_OPSLIMIT_SENSITIVE,
+        crypto_pwhash_MEMLIMIT_SENSITIVE,
         crypto_pwhash_ALG_ARGON2ID13
     );
 }
