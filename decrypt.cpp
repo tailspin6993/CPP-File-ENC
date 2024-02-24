@@ -74,7 +74,7 @@ int main() {
     crypto_generichash_blake2b_final(&state, computedMasterKeyDigest, sizeof computedMasterKeyDigest);
     
     if (sodium_memcmp(computedMasterKeyDigest, masterKeyDigest, sizeof computedMasterKeyDigest) != 0) {
-        std::cout << "Incorrect password." << std::endl;
+        std::cout << "Incorrect password or file not encrypted." << std::endl;
         return 1;
     }
 
